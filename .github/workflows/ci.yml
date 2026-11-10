@@ -9,30 +9,34 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest #machine virtuel ou on a lance le pipeline
+    runs-on: ubuntu-latest
     env:
       DOCKER_IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/democyber:latest
 
     steps:
-      # Récupérer le code 
+      # ========== PARTIE I : GITLEAKS ==========
+
+      # Récupérer le code (historique complet pour Gitleaks)
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # Gitleaks scan 
+      # Gitleaks scan (before compilation)
       - name: Run Gitleaks scan
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Upload the Gitleaks report 
+      # Upload the Gitleaks report
       - name: Upload Gitleaks report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: gitleaks-report
           path: results.sarif
+
+      # ========== BUILD JAVA ==========
 
       # Installer Java
       - name: Set up JDK 21
@@ -42,6 +46,34 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      # Build Maven 
+      # Build Maven
       - name: Build Java project with Maven
         run: mvn -B clean package
+
+      # ========== PARTIE II : DOCKER + TRIVY ==========
+
+      # Login Docker Hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Build Docker image
+      - name: Build Docker image
+        run: docker build -t $DOCKER_IMAGE_NAME .
+
+      # Afficher nom, tag et taille de l'image
+      - name: Show Docker image details
+        run: docker images $DOCKER_IMAGE_NAME
+
+      # Test Docker image
+      - name: Test Docker image locally
+        run: |
+          docker run -d --name democyber-test -p 8080:8080 $DOCKER_IMAGE_NAME
+          sleep 10
+          curl -f http://localhost:8080 || echo "App not responding"
+          docker stop democyber-test
+          docker rm democyber-test
+
+      
