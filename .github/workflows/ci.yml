@@ -9,24 +9,24 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest #machine virtuel ou on a lance le pipeline
     env:
       DOCKER_IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/democyber:latest
 
     steps:
-      # Récupérer le code (historique complet pour Gitleaks)
+      # Récupérer le code 
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # Gitleaks scan (before compilation)
+      # Gitleaks scan 
       - name: Run Gitleaks scan
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Upload the Gitleaks report (même si des secrets sont détectés)
+      # Upload the Gitleaks report 
       - name: Upload Gitleaks report
         if: always()
         uses: actions/upload-artifact@v4
@@ -42,6 +42,6 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      # Build Maven (clean package compile déjà le code)
+      # Build Maven 
       - name: Build Java project with Maven
         run: mvn -B clean package
